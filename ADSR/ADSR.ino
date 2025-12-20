@@ -28,7 +28,7 @@
 // uses DaisySP ADSR 
 // RH Nov 2025
 
-#include <io.h>
+#include <2HPico_io.h>
 #include <I2S.h>
 #include <Adafruit_NeoPixel.h>
 #include "pico/multicore.h"

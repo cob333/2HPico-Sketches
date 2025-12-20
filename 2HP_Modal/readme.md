@@ -8,6 +8,8 @@ Adafruit Neopixel library
 
 2HPicolib support library in this repository
 
+***Use a Pico 2 board and overclock it to 250Mhz - this sketch is very CPU intensive***
+
 **Usage:**
 
 Top jack - trigger input
@@ -16,7 +18,11 @@ Middle jack - pitch CV input
 
 Bottom jack - audio out
 
+Button - press to switch between parameter pages
+
+
 Page 1 parameters - Red LED
+
 
 Pot 1 - structure
 
@@ -27,6 +33,7 @@ Pot 3 - brightness
 Pot 4 - frequency
 
 Page 2 parameters - Green LED
+
 
 Pot 1 - accent
 
