@@ -8,6 +8,6 @@ Select board type as Raspberry Pi Pico or Raspberry Pico Pico 2 depending on wha
 
 Dependencies:
 
-2HPico library included in thie repository
+2HPico library included in this repository - install it in your Arduino/Libraries directory
 
 Adafruit Neopixel library
