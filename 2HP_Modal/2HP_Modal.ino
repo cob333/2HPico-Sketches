@@ -179,7 +179,7 @@ void loop() {
   voice.SetFreq(pow(2,(cv/CVIN_VOLT))*minfreq); // ~ 7 octave range
 
   if (!digitalRead(TRIGGER)) {
-    if (((millis()-trigtimer) > TRIG_DEBOUNCE) && !trigger) {  // if button pressed advance to next parameter set
+    if (((millis()-trigtimer) > TRIG_DEBOUNCE) && !trigger) {  // trigger detection
       trigger=1;  
       voice.Trig();
     }
