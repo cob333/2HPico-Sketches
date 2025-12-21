@@ -29,6 +29,7 @@
 
 #include "2HPico_io.h"
 #include "ClickButton.h"
+#include "scales.h"
 
 // for Adafruit Neopixels
 #define NUMPIXELS 1 // 
@@ -49,6 +50,9 @@
 #define TRIG_DEBOUNCE 1  // short trigger debounce too
 #define CLOCK_DEBOUNCE 1 // short clock debounce
 #define PARAMETERUPDATE 100  // some DaisySP models don't like values that jump around a lot so limit the changes
+
+#define GATEHIGH -32767    // DAC values for gate levels
+#define GATELOW 32767
 
 // A/D values from CV inputs
 
