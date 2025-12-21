@@ -1,4 +1,4 @@
-# 8 step sequencer
+# 2HPico 8 step sequencer
 
 **Dependencies:**
 
