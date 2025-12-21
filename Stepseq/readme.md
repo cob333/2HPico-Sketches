@@ -37,7 +37,7 @@ Adafruit Neopixel library
 
  page 3 parameters GREEN LED
  
- Pot 1 - scale
+ Pot 1 - scale - full ccw major pentatonic. 9-12 o'clock major, 12-3 o'clock minor pentatonic, full cw minor
  
  Pot 2 - clock divider
  
