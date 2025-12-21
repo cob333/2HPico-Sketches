@@ -1,4 +1,4 @@
-# 2HPico Modal Resonator Sketch - very similar to Mutable Instruments Rings
+# 8 step sequencer
 
 **Dependencies:**
 
