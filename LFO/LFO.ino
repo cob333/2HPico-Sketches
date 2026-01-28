@@ -77,7 +77,7 @@ I2S DAC(OUTPUT);  // using stereo DAC
 #define NWAVES 6  // number of different waveforms
 
 enum {RAMP, SINE, EXPO, QUARTIC, RANDOM1, PULSE}; // wave shape indexes
-int32_t wavelut[NWAVES]={RED,ORANGE,GREEN,BLUE,AQUA,VIOLET}; // maps waveforms to different colors
+int32_t wavelut[NWAVES]={RED,YELLOW,GREEN,BLUE,AQUA,VIOLET}; // maps waveforms to different colors
 
 Adafruit_NeoPixel LEDS(NUMPIXELS, LEDPIN, NEO_GRB + NEO_KHZ800);
 

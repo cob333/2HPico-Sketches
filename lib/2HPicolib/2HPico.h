@@ -33,12 +33,24 @@
 
 // for Adafruit Neopixels
 #define NUMPIXELS 1 // 
-#define RED 0x1f0000  // only using 5 bits to keep LEDs from getting too bright
-#define GREEN 0x001f00
-#define BLUE 0x00001f
-#define ORANGE (RED|GREEN)
-#define VIOLET (RED|BLUE)
-#define AQUA (GREEN|BLUE)
+// only using 5 bits per channel to keep LEDs from getting too bright
+#define LED_BRIGHT_1 0x1f
+#define LED_BRIGHT_0_5 0x10
+#define LED_BRIGHT_0_25 0x08
+#define RGB(r, g, b) ( ((uint32_t)((r) & 0x1f) << 16) | ((uint32_t)((g) & 0x1f) << 8) | (uint32_t)((b) & 0x1f) )
+#define RED   RGB(LED_BRIGHT_1, 0, 0)
+#define GREEN RGB(0, LED_BRIGHT_1, 0)
+#define BLUE  RGB(0, 0, LED_BRIGHT_1)
+#define YELLOW RGB(LED_BRIGHT_1, LED_BRIGHT_1, 0)
+#define VIOLET RGB(LED_BRIGHT_1, 0, LED_BRIGHT_1)
+#define AQUA RGB(0, LED_BRIGHT_1, LED_BRIGHT_1)
+#define ORANGE RGB(LED_BRIGHT_1, LED_BRIGHT_0_25, 0)
+#define PINK  RGB(LED_BRIGHT_1, 0, LED_BRIGHT_0_25)
+#define TEAL  RGB(0, LED_BRIGHT_0_25, LED_BRIGHT_1)
+#define WHITE RGB(LED_BRIGHT_1, LED_BRIGHT_1, LED_BRIGHT_1)
+#define GREY  RGB(LED_BRIGHT_0_25, LED_BRIGHT_0_25, LED_BRIGHT_0_25)
+
+
 
 // constants for integer to float and float to integer conversion
 #define MULT_16 2147483647

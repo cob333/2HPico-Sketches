@@ -24,7 +24,7 @@
 //
 // -----------------------------------------------------------------------------
 //
-// 8 step sequencer for 2HP hardware Dec 2025
+// 16 step sequencer for 2HP hardware Dec 2025
 // module must be jumpered for CV out on jack 2 which is used as Gate output
 // uses Adafruit NeoPixel library
 // V1.0 RH Dec 2025
@@ -39,13 +39,25 @@
 // pot 3 - step 3 pitch
 // pot 4 - step 4 pitch
 
-// page 2 parameters - Orange LED
+// page 2 parameters - Violet LED
 // Pot 1 - step 5 pitch
 // pot 2 - step 6 pitch
 // pot 3 - step 7 pitch
 // pot 4 - step 8 pitch
 
-// page 3 parameters GREEN LED
+// page 3 parameters - Blue LED
+// Pot 1 - step 9 pitch
+// pot 2 - step 10 pitch
+// pot 3 - step 11 pitch
+// pot 4 - step 12 pitch
+
+// page 4 parameters - Aqua LED
+// Pot 1 - step 13 pitch
+// pot 2 - step 14 pitch
+// pot 3 - step 15 pitch
+// pot 4 - step 16 pitch
+
+// page 5 parameters Green LED
 // Pot 1 - scale
 // Pot 2 - clock divider
 // Pot 3 - number of steps
@@ -63,8 +75,8 @@
 #define DEBUG   // comment out to remove debug code
 #define MONITOR_CPU1  // define to enable 2nd core monitoring
 
-//#define SAMPLERATE 11025 
-#define SAMPLERATE 22050  // saves CPU cycles
+//#define SAMPLERATE 11025
+#define SAMPLERATE 22050  // saves CPU cycles on RP2350
 //#define SAMPLERATE 44100
 
 Adafruit_NeoPixel LEDS(NUMPIXELS, LEDPIN, NEO_GRB + NEO_KHZ800);
@@ -73,37 +85,48 @@ I2S DAC(OUTPUT);  //
 
 
 // sequencer stuff
-#define MAX_STEPS 8
+#define MAX_STEPS 16
 #define MAX_SCALES 4   // there are more scales than this but works best if you only use a few
 #define NOTERANGE 36  // 3 octave range seems reasonable
 #define CLOCKIN TRIGGER  // top jack is clock
+#define MAX_RATCHET 8
 
 
 #define CVIN_VOLT 580.6  // a/d count per volt - **** adjust this value to calibrate V/octave input
 #define CVOUT_VOLT 6554 // D/A count per volt - nominally +-5v range for -+32767 DAC values- ***** adjust this value to calibrate V/octave out
 #define CVOUTMIN -2*CVOUT_VOLT  // lowest output CV ie MIDI note 0
 
-int8_t notes[MAX_STEPS]={0,0,0,0,0,0,0,0};
+int8_t notes[MAX_STEPS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t ratchets[MAX_STEPS]={1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 int16_t gateout=GATELOW;      // sent to right dac channel
 int16_t cvout=CVOUTMIN;  // sent to left DAC channel
 int16_t cvoffset=12000; // base pitch set by UI
 int8_t stepindex=0;
-int8_t laststep=7;
+int8_t laststep=15;
 int16_t scale=0;
 
 int8_t clockdivideby=1;  // divide input clock by this
 int8_t clockdivider=1;   // counts down clocks
 
 bool clocked=0;  // keeps track of clock state
+bool clockidle=0;  // true after clock timeout reset
 bool button=0;  // keeps track of button state
+bool ratchet_active=0;
+bool ratchet_editing=0;
+uint8_t ratchet_count=1;
+uint8_t ratchet_index=0;
+uint32_t ratchet_interval=0;
+uint32_t ratchet_next_time=0;
+uint32_t pagecolor=RED;
 
-#define NUMUISTATES 3
-enum UIstates {SET1,SET2,SET3} ;
+#define NUMUISTATES 5
+enum UIstates {SET1,SET2,SET3,SET4,SET5} ;
 uint8_t UIstate=SET1;
-uint32_t buttontimer,clocktimer,clockperiod,clockdebouncetimer,ledtimer, gatetimer, gatelength;
+uint32_t buttontimer,buttonpress,clocktimer,clockperiod,clockdebouncetimer,ledtimer, gatetimer, gatelength;
 
 #define LEDOFF 100 // LED trigger flash time 
-
+#define CLOCK_RESET_MS 1000  // reset to step 1 after 1s without clock
+#define LONG_PRESS_MS 500  // hold time to enter ratchet edit mode
 
 
 void setup() { 
@@ -142,52 +165,173 @@ void setup() {
   Serial.println("finished setup");  
 #endif
   clocktimer=millis(); // initial clock measurement
+  clockperiod=CLOCK_RESET_MS;
 }
 
 
 void loop() {
 // ******* still need to implement reset sequence on hold
-  if (!digitalRead(BUTTON1)) {
-    if (((millis()-buttontimer) > DEBOUNCE) && !button) {  // if button pressed advance to next parameter set
-      button=1;  
-      ++UIstate;
-      if (UIstate >= NUMUISTATES) UIstate=SET1;
-      lockpots();
+  bool buttonraw = !digitalRead(BUTTON1);
+  if (buttonraw) {
+    if (((millis()-buttontimer) > DEBOUNCE) && !button) {  // button pressed
+      button=1;
+      buttonpress=millis();
+      ratchet_editing=0;
     }
   }
   else {
+    if (button) {  // button released
+      uint32_t held_ms=millis()-buttonpress;
+      if ((held_ms < LONG_PRESS_MS) && !ratchet_editing) {  // short press changes page
+        ++UIstate;
+        if (UIstate >= NUMUISTATES) UIstate=SET1;
+        lockpots();
+      }
+      button=0;
+      ratchet_editing=0;
+    }
     buttontimer=millis();
-    button=0;
   }
 
   samplepots();
+
+  bool ratchet_mode = button && ((millis()-buttonpress) >= LONG_PRESS_MS) && (UIstate != SET5);
 
 // set parameters from panel pots
 // 
   switch (UIstate) {
     case SET1:
-      LEDS.setPixelColor(0, RED);  // set sequencer step values from pot settings
-      if (!potlock[0]) notes[0]=map(pot[0],0,AD_RANGE-1,-1,NOTERANGE); // top pot on the panel
-      if (!potlock[1]) notes[1]=map(pot[1],0,AD_RANGE-1,-1,NOTERANGE);  // -1 is note off
-      if (!potlock[2]) notes[2]=map(pot[2],0,AD_RANGE-1,-1,NOTERANGE); 
-      if (!potlock[3]) notes[3]=map(pot[3],0,AD_RANGE-1,-1,NOTERANGE); 
+      pagecolor=RED;
+      LEDS.setPixelColor(0, pagecolor);  // set sequencer step values from pot settings
+      if (ratchet_mode) {
+        if (!potlock[0]) {
+          uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[0] != val) { ratchets[0]=val; ratchet_editing=1; }
+        }
+        if (!potlock[1]) {
+          uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[1] != val) { ratchets[1]=val; ratchet_editing=1; }
+        }
+        if (!potlock[2]) {
+          uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[2] != val) { ratchets[2]=val; ratchet_editing=1; }
+        }
+        if (!potlock[3]) {
+          uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[3] != val) { ratchets[3]=val; ratchet_editing=1; }
+        }
+      }
+      else {
+        if (!potlock[0]) notes[0]=map(pot[0],0,AD_RANGE-1,-1,NOTERANGE); // top pot on the panel
+        if (!potlock[1]) notes[1]=map(pot[1],0,AD_RANGE-1,-1,NOTERANGE);  // -1 is note off
+        if (!potlock[2]) notes[2]=map(pot[2],0,AD_RANGE-1,-1,NOTERANGE);
+        if (!potlock[3]) notes[3]=map(pot[3],0,AD_RANGE-1,-1,NOTERANGE);
+      }
       break;
     case SET2:
-      LEDS.setPixelColor(0, ORANGE);
-      if (!potlock[0]) notes[4]=map(pot[0],0,AD_RANGE-1,-1,NOTERANGE); // top pot on the panel
-      if (!potlock[1]) notes[5]=map(pot[1],0,AD_RANGE-1,-1,NOTERANGE);  // 
-      if (!potlock[2]) notes[6]=map(pot[2],0,AD_RANGE-1,-1,NOTERANGE);
-      if (!potlock[3]) notes[7]=map(pot[3],0,AD_RANGE-1,-1,NOTERANGE);   
+      pagecolor=VIOLET;
+      LEDS.setPixelColor(0, pagecolor);
+      if (ratchet_mode) {
+        if (!potlock[0]) {
+          uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[4] != val) { ratchets[4]=val; ratchet_editing=1; }
+        }
+        if (!potlock[1]) {
+          uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[5] != val) { ratchets[5]=val; ratchet_editing=1; }
+        }
+        if (!potlock[2]) {
+          uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[6] != val) { ratchets[6]=val; ratchet_editing=1; }
+        }
+        if (!potlock[3]) {
+          uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[7] != val) { ratchets[7]=val; ratchet_editing=1; }
+        }
+      }
+      else {
+        if (!potlock[0]) notes[4]=map(pot[0],0,AD_RANGE-1,-1,NOTERANGE); // top pot on the panel
+        if (!potlock[1]) notes[5]=map(pot[1],0,AD_RANGE-1,-1,NOTERANGE);  //
+        if (!potlock[2]) notes[6]=map(pot[2],0,AD_RANGE-1,-1,NOTERANGE);
+        if (!potlock[3]) notes[7]=map(pot[3],0,AD_RANGE-1,-1,NOTERANGE);
+      }
       break;
     case SET3:
-      LEDS.setPixelColor(0, GREEN);
-      if (!potlock[0]) scale=map(pot[0],0,AD_RANGE,0,MAX_SCALES);  // set scale - too many scales gets hard to discern by ear 
- //     if (!potlock[1]) clockdivideby=map(pot[1],0,AD_RANGE-1,1,5); // set clock divider *** timing is off
-      if (!potlock[2]) laststep=map(pot[2],0,AD_RANGE-1,1,MAX_STEPS); // set steps
+      pagecolor=BLUE;
+      LEDS.setPixelColor(0, pagecolor);
+      if (ratchet_mode) {
+        if (!potlock[0]) {
+          uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[8] != val) { ratchets[8]=val; ratchet_editing=1; }
+        }
+        if (!potlock[1]) {
+          uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[9] != val) { ratchets[9]=val; ratchet_editing=1; }
+        }
+        if (!potlock[2]) {
+          uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[10] != val) { ratchets[10]=val; ratchet_editing=1; }
+        }
+        if (!potlock[3]) {
+          uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[11] != val) { ratchets[11]=val; ratchet_editing=1; }
+        }
+      }
+      else {
+        if (!potlock[0]) notes[8]=map(pot[0],0,AD_RANGE-1,-1,NOTERANGE); // top pot on the panel
+        if (!potlock[1]) notes[9]=map(pot[1],0,AD_RANGE-1,-1,NOTERANGE);  //
+        if (!potlock[2]) notes[10]=map(pot[2],0,AD_RANGE-1,-1,NOTERANGE);
+        if (!potlock[3]) notes[11]=map(pot[3],0,AD_RANGE-1,-1,NOTERANGE);
+      }
+      break;
+    case SET4:
+      pagecolor=AQUA;
+      LEDS.setPixelColor(0, pagecolor);
+      if (ratchet_mode) {
+        if (!potlock[0]) {
+          uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[12] != val) { ratchets[12]=val; ratchet_editing=1; }
+        }
+        if (!potlock[1]) {
+          uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[13] != val) { ratchets[13]=val; ratchet_editing=1; }
+        }
+        if (!potlock[2]) {
+          uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[14] != val) { ratchets[14]=val; ratchet_editing=1; }
+        }
+        if (!potlock[3]) {
+          uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
+          if (ratchets[15] != val) { ratchets[15]=val; ratchet_editing=1; }
+        }
+      }
+      else {
+        if (!potlock[0]) notes[12]=map(pot[0],0,AD_RANGE-1,-1,NOTERANGE); // top pot on the panel
+        if (!potlock[1]) notes[13]=map(pot[1],0,AD_RANGE-1,-1,NOTERANGE);  //
+        if (!potlock[2]) notes[14]=map(pot[2],0,AD_RANGE-1,-1,NOTERANGE);
+        if (!potlock[3]) notes[15]=map(pot[3],0,AD_RANGE-1,-1,NOTERANGE);
+      }
+      break;
+    case SET5:
+      pagecolor=GREEN;
+      LEDS.setPixelColor(0, pagecolor);
+      if (!potlock[0]) scale=map(pot[0],0,AD_RANGE,0,MAX_SCALES);  // set scale - too many scales gets hard to discern by ear
+      if (!potlock[1]) clockdivideby=map(pot[1],0,AD_RANGE-1,1,8); // set clock divider
+      if (!potlock[2]) {
+        int16_t steps=(pot[2]*MAX_STEPS + (AD_RANGE/2)) / AD_RANGE; // round to reach full range
+        if (steps < 1) steps=1;
+        if (steps > MAX_STEPS) steps=MAX_STEPS;
+        laststep=steps-1; // set number of steps
+      }
       if (!potlock[3]) cvoffset=map(pot[3],0,AD_RANGE-1,CVOUTMIN,32767); // sets overall pitch
       break;
     default:
       break;
+  }
+
+  if (button) {
+    LEDS.setPixelColor(0, pagecolor);
+    LEDS.show();
   }
 
   if (!digitalRead(CLOCKIN)) {  // look for rising edge of clock input which is inverted
@@ -196,20 +340,40 @@ void loop() {
       clocked=1;
       if (clockdivider <=0) {       
         clockdivider=clockdivideby;
-        clockperiod=millis()-clocktimer; // measure clock so we can set gate time relative to clock period
-        clocktimer=millis();
+        uint32_t now=millis();
+        if (!clockidle) clockperiod=now-clocktimer; // measure clock so we can set gate time relative to clock period
+        clocktimer=now;
+        clockidle=0;
+
+        uint8_t rcount=ratchets[stepindex];
+        if (rcount < 1) rcount=1;
+        ratchet_count=rcount;
+        ratchet_index=0;
+        ratchet_active=0;
+        ratchet_interval=clockperiod/ratchet_count;
+        if (ratchet_interval < 1) ratchet_interval=1;
 
         if (notes[stepindex]>=0) {  // negative note value is silent so don't change CV
           cvout=-(quantize(notes[stepindex],scales[scale],0)*(CVOUT_VOLT/12)+CVOUTMIN+cvoffset); // 1v per octave. note numbers are MIDI style 0-127. DAC out is inverted. 
           gateout=GATEHIGH;
-          gatelength=clockperiod/2; // could be made adjustable
-          gatetimer=millis(); // start gate timer
-          LEDS.setPixelColor(0,0 ); // show gate as a LED off flash
-          LEDS.show();  // update LED
-          ledtimer=millis(); // start led off timer
+          if (ratchet_count > 1) {
+            gatelength=ratchet_interval/2;
+            if (gatelength < 1) gatelength=1;
+            ratchet_active=1;
+            ratchet_index=1;
+            ratchet_next_time=now+ratchet_interval;
+          }
+          else gatelength=clockperiod/2; // could be made adjustable
+          gatetimer=now; // start gate timer
  //         Serial.printf("scale %s note %s \n",scalenames[scale],notenames[notes[stepindex]%12]);
         }
         else gateout=GATELOW;
+        if (!button) {
+          uint32_t stepcolor = (stepindex == 0) ? YELLOW : 0;
+          LEDS.setPixelColor(0, stepcolor); // blink each step, orange on step 1
+          LEDS.show();  // update LED
+          ledtimer=millis(); // start led flash timer
+        }
         ++stepindex; // advance sequencer  could add sequencer modes - pingpong, reverse etc
         if (stepindex > laststep) stepindex=0;
       }
@@ -221,9 +385,30 @@ void loop() {
   }
 //Serial.printf("clkdiv %d len %d \n", clockdivideby,laststep);
 
+  if (!clockidle && (millis()-clocktimer) > CLOCK_RESET_MS) {
+    stepindex=0;
+    clockdivider=clockdivideby;
+    gateout=GATELOW;
+    clockidle=1;
+    ratchet_active=0;
+  }
+
+  if (ratchet_active) {
+    uint32_t now=millis();
+    if ((int32_t)(now-ratchet_next_time) >= 0) {
+      gateout=GATEHIGH;
+      gatetimer=now;
+      gatelength=ratchet_interval/2;
+      if (gatelength < 1) gatelength=1;
+      ++ratchet_index;
+      if (ratchet_index >= ratchet_count) ratchet_active=0;
+      else ratchet_next_time+=ratchet_interval;
+    }
+  }
+
   if ((millis()-gatetimer) > gatelength) gateout=GATELOW;  // turn off gate after gate length
 
-  if ((millis()-ledtimer) > LEDOFF ) LEDS.show();  // update LEDs only if not doing off flash
+  if (!button && (millis()-ledtimer) > LEDOFF ) LEDS.show();  // update LEDs only if not doing off flash
 }
 
 // second core setup
@@ -246,8 +431,3 @@ void loop1(){
   digitalWrite(CPU_USE,1); // hi = CPU busy
 #endif
 }
-
-
-
-
-
