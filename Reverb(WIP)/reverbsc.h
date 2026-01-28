@@ -1,3 +1,5 @@
+// Contributor: Wenhao Yang
+
 #pragma once
 #ifndef DSYSP_REVERBSC_H
 #define DSYSP_REVERBSC_H

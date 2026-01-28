@@ -1,3 +1,5 @@
+// Contributor: Wenhao Yang
+
 // LED color test for 2HPico
 // Cycles through all predefined colors (including WHITE/GREY).
 
