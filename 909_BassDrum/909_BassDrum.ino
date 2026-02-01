@@ -26,12 +26,12 @@
 //
 /*
 R Heslip
-// simple bass drum voice synth 
-// RH for new 2HP hardware Nov 2025
+// Synthetic bass drum voice synth using DaisySP SyntheticBassDrum
+// RH for 2HP hardware Nov 2025
 
 Top Jack - trigger input 
 
-Middle jack - FM input
+Middle jack - Accent input
 
 Bottom Jack - output
 
@@ -39,13 +39,11 @@ Top pot - Accent
 
 Second pot - Tone
 
-Third pot - controls self FM and attack FM
+Third pot - Decay
 
 Fourth pot - Frequency
 
 */
-
-
 
 #include <2HPico.h>
 #include <I2S.h>
@@ -70,14 +68,13 @@ using namespace daisysp;
 
 // including the source files is a pain but that way you compile in only the modules you need
 // DaisySP statically allocates memory and some modules e.g. reverb use a lot of ram
-#include "drums/analogbassdrum.cpp"
+#include "drums/synthbassdrum.cpp"
 #include "filters/svf.cpp"
 
 float samplerate=SAMPLERATE;  // for DaisySP
 
 // create daisySP processing objects
-AnalogBassDrum   bassdrum;  
-
+SyntheticBassDrum   kick;  
 
 // a/d values from pots
 // pots are used for two or more parameters so we don't change the values till
@@ -87,6 +84,7 @@ AnalogBassDrum   bassdrum;
 #define CV_VOLT 580.6  // a/d counts per volt - calibrate this value for accurate V/octave
 
 float minfreq=10;
+float maxfreq=120;
 
 bool trigger=0;
 bool button=0;
@@ -118,7 +116,16 @@ void setup() {
 
   analogReadResolution(AD_BITS); // set up for max resolution
 
-  bassdrum.Init(samplerate);
+  kick.Init(samplerate);
+  
+  // Set default parameters - tuned for low distortion
+  kick.SetAccent(0.15f);          // Reduced from 0.3f for less aggressive sound
+  kick.SetTone(0.5f);             // Medium brightness
+  kick.SetDecay(0.5f);            // Medium decay
+  kick.SetFreq(60.0f);
+  kick.SetDirtiness(0.2f);        // Reduced from 0.3f - less harmonic distortion
+  kick.SetFmEnvelopeAmount(0.5f); // Reduced from 0.6f - less FM modulation
+  kick.SetFmEnvelopeDecay(0.3f);  // Reduced from 0.3f
 
   // Enable the AudioShield
 // set up Pico I2S for PT8211 stereo DAC
@@ -143,7 +150,7 @@ void loop() {
       ++UIstate;
       if (UIstate >= NUMUISTATES) UIstate=SET1;
       lockpots();
-      Serial.printf("state %d %d\n",UIstate, sizeof(UIstates)); 
+      Serial.printf("state %d\n",UIstate); 
     }
   }
   else {
@@ -160,28 +167,24 @@ void loop() {
     switch (UIstate) {
       case SET1:
         LEDS.setPixelColor(0, RED);  
-        if (!potlock[0]) bassdrum.SetAccent(mapf(pot[0],0,AD_RANGE,0,1));  // very subtle  - 
-        // if (!potlock[0]) bassdrum.SetDecay(mapf(pot[0],0,AD_RANGE,0,2000));  // the SetDecay() function in the drum model doesn't do anything 
-        if (!potlock[1]) bassdrum.SetTone(mapf(pot[1],0,AD_RANGE,0,1));
-        if (!potlock[2]) {  // use this pot as a macro for both FM settings. keeps number of parameters to one page
-          bassdrum.SetSelfFmAmount(mapf(pot[2],0,AD_RANGE,0,5));
-          bassdrum.SetAttackFmAmount(mapf(pot[1],0,AD_RANGE,0,1));
-        }
-        if (!potlock[3]) minfreq=(mapf(pot[3],0,AD_RANGE-1,10,120)); // 
+        if (!potlock[0]) kick.SetAccent(mapf(pot[0],0,AD_RANGE,0,1));      // Top pot - Accent
+        if (!potlock[1]) kick.SetTone(mapf(pot[1],0,AD_RANGE,0,1));        // Second pot - Tone
+        if (!potlock[2]) kick.SetDecay(mapf(pot[2],0,AD_RANGE,0,1));       // Third pot - Decay
+        if (!potlock[3]) minfreq=mapf(pot[3],0,AD_RANGE-1,10,120);         // Fourth pot - Frequency (base)
         break;
       default:
         break;
     }
   }
 
-  float cv=(AD_RANGE-sampleCV2()); // CV in is inverted
+  float cv=(AD_RANGE-sampleCV2()); // CV in is inverted - Middle jack Accent input
 
-  bassdrum.SetFreq(pow(2,(cv/AD_RANGE))*minfreq); // ~ 3.5 octave FM range
+  kick.SetAccent(mapf(cv, 0, AD_RANGE, 0, 1)); // Accent from middle jack
 
   if (!digitalRead(TRIGGER)) {
-    if (((millis()-trigtimer) > TRIG_DEBOUNCE) && !trigger) {  // 
+    if (((millis()-trigtimer) > TRIG_DEBOUNCE) && !trigger) {  // Top jack - trigger input
       trigger=1;  
-      bassdrum.Trig();
+      kick.Trig();
     }
   }
   else {
@@ -203,9 +206,12 @@ void loop1(){
   static  float sig;
   static  int32_t outsample;
 
-
-  sig=bassdrum.Process();
-  outsample = (int32_t)(sig*MULT_16)>>14; // scale output up 4x - seems very low
+  sig=kick.Process();  // Bottom jack - output
+  
+  // Output scaling: reduce amplitude to prevent clipping
+  // Clamp signal to [-1.0, 1.0] before scaling
+  sig = std::fmax(-1.0f, std::fmin(1.0f, sig * 0.5f));  // 50% gain, prevent clipping
+  outsample = (int32_t)(sig * 32767.0f);  // Scale to int16 range
 
 #ifdef MONITOR_CPU1  
   digitalWrite(CPU_USE,0); // low - CPU not busy
@@ -218,8 +224,3 @@ void loop1(){
   digitalWrite(CPU_USE,1); // hi = CPU busy
 #endif
 }
-
-
-
-
-

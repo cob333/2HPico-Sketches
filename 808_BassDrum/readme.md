@@ -1,7 +1,6 @@
 # 2HPico Analog Bassdrum
 
-uses the DaisySP AnalogBassDrum model - which isn't that great
-
+uses the DaisySP AnalogBassDrum model
 Top Jack - trigger input 
 
 Middle jack - FM input
@@ -14,6 +13,6 @@ Top pot - Accent
 
 Second pot - Tone
 
-Third pot - controls self FM and attack FM
+Third pot - decay
 
 Fourth pot - Frequency
