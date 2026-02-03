@@ -94,7 +94,7 @@ I2S DAC(OUTPUT);  //
 
 
 #define CVIN_VOLT 580.6  // a/d count per volt - **** adjust this value to calibrate V/octave input
-#define CVOUT_VOLT 6554 // D/A count per volt - nominally +-5v range for -+32767 DAC values- ***** adjust this value to calibrate V/octave out
+#define CVOUT_VOLT 5456 // D/A count per volt - nominally +-5v range for -+32767 DAC values- ***** adjust this value to calibrate V/octave out
 #define CVOUTMIN -2*CVOUT_VOLT  // lowest output CV ie MIDI note 0
 
 int8_t notes[MAX_STEPS]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -114,11 +114,13 @@ bool clockidle=0;  // true after clock timeout reset
 bool button=0;  // keeps track of button state
 bool ratchet_active=0;
 bool ratchet_editing=0;
+bool ratchet_mode_prev=0;
 uint8_t ratchet_count=1;
 uint8_t ratchet_index=0;
 uint32_t ratchet_interval=0;
 uint32_t ratchet_next_time=0;
 uint32_t pagecolor=RED;
+uint16_t ratchet_pot_last[NUMPOTS]={0,0,0,0};
 
 #define NUMUISTATES 5
 enum UIstates {SET1,SET2,SET3,SET4,SET5} ;
@@ -128,6 +130,7 @@ uint32_t buttontimer,buttonpress,clocktimer,clockperiod,clockdebouncetimer,ledti
 #define LEDOFF 100 // LED trigger flash time 
 #define CLOCK_RESET_MS 1000  // reset to step 1 after 1s without clock
 #define LONG_PRESS_MS 500  // hold time to enter ratchet edit mode
+#define RATCHET_POT_THRESHOLD 150  // pot delta required to accept ratchet change
 
 
 void setup() { 
@@ -197,6 +200,10 @@ void loop() {
   samplepots();
 
   bool ratchet_mode = button && ((millis()-buttonpress) >= LONG_PRESS_MS) && (UIstate != SET5);
+  if (ratchet_mode && !ratchet_mode_prev) {
+    for (int i=0; i<NUMPOTS; ++i) ratchet_pot_last[i]=pot[i];
+  }
+  ratchet_mode_prev = ratchet_mode;
 
 // set parameters from panel pots
 // 
@@ -206,20 +213,44 @@ void loop() {
       LEDS.setPixelColor(0, pagecolor);  // set sequencer step values from pot settings
       if (ratchet_mode) {
         if (!potlock[0]) {
-          uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[0] != val) { ratchets[0]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[0]-(int)ratchet_pot_last[0]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[0] != val) { ratchets[0]=val; ratchet_editing=1; }
+            ratchet_pot_last[0]=pot[0];
+          }
         }
         if (!potlock[1]) {
-          uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[1] != val) { ratchets[1]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[1]-(int)ratchet_pot_last[1]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[1] != val) { ratchets[1]=val; ratchet_editing=1; }
+            ratchet_pot_last[1]=pot[1];
+          }
         }
         if (!potlock[2]) {
-          uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[2] != val) { ratchets[2]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[2]-(int)ratchet_pot_last[2]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[2] != val) { ratchets[2]=val; ratchet_editing=1; }
+            ratchet_pot_last[2]=pot[2];
+          }
         }
         if (!potlock[3]) {
-          uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[3] != val) { ratchets[3]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[3]-(int)ratchet_pot_last[3]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[3] != val) { ratchets[3]=val; ratchet_editing=1; }
+            ratchet_pot_last[3]=pot[3];
+          }
         }
       }
       else {
@@ -234,20 +265,44 @@ void loop() {
       LEDS.setPixelColor(0, pagecolor);
       if (ratchet_mode) {
         if (!potlock[0]) {
-          uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[4] != val) { ratchets[4]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[0]-(int)ratchet_pot_last[0]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[4] != val) { ratchets[4]=val; ratchet_editing=1; }
+            ratchet_pot_last[0]=pot[0];
+          }
         }
         if (!potlock[1]) {
-          uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[5] != val) { ratchets[5]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[1]-(int)ratchet_pot_last[1]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[5] != val) { ratchets[5]=val; ratchet_editing=1; }
+            ratchet_pot_last[1]=pot[1];
+          }
         }
         if (!potlock[2]) {
-          uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[6] != val) { ratchets[6]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[2]-(int)ratchet_pot_last[2]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[6] != val) { ratchets[6]=val; ratchet_editing=1; }
+            ratchet_pot_last[2]=pot[2];
+          }
         }
         if (!potlock[3]) {
-          uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[7] != val) { ratchets[7]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[3]-(int)ratchet_pot_last[3]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[7] != val) { ratchets[7]=val; ratchet_editing=1; }
+            ratchet_pot_last[3]=pot[3];
+          }
         }
       }
       else {
@@ -262,20 +317,44 @@ void loop() {
       LEDS.setPixelColor(0, pagecolor);
       if (ratchet_mode) {
         if (!potlock[0]) {
-          uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[8] != val) { ratchets[8]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[0]-(int)ratchet_pot_last[0]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[8] != val) { ratchets[8]=val; ratchet_editing=1; }
+            ratchet_pot_last[0]=pot[0];
+          }
         }
         if (!potlock[1]) {
-          uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[9] != val) { ratchets[9]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[1]-(int)ratchet_pot_last[1]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[9] != val) { ratchets[9]=val; ratchet_editing=1; }
+            ratchet_pot_last[1]=pot[1];
+          }
         }
         if (!potlock[2]) {
-          uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[10] != val) { ratchets[10]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[2]-(int)ratchet_pot_last[2]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[10] != val) { ratchets[10]=val; ratchet_editing=1; }
+            ratchet_pot_last[2]=pot[2];
+          }
         }
         if (!potlock[3]) {
-          uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[11] != val) { ratchets[11]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[3]-(int)ratchet_pot_last[3]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[11] != val) { ratchets[11]=val; ratchet_editing=1; }
+            ratchet_pot_last[3]=pot[3];
+          }
         }
       }
       else {
@@ -290,20 +369,44 @@ void loop() {
       LEDS.setPixelColor(0, pagecolor);
       if (ratchet_mode) {
         if (!potlock[0]) {
-          uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[12] != val) { ratchets[12]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[0]-(int)ratchet_pot_last[0]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[0],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[12] != val) { ratchets[12]=val; ratchet_editing=1; }
+            ratchet_pot_last[0]=pot[0];
+          }
         }
         if (!potlock[1]) {
-          uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[13] != val) { ratchets[13]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[1]-(int)ratchet_pot_last[1]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[1],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[13] != val) { ratchets[13]=val; ratchet_editing=1; }
+            ratchet_pot_last[1]=pot[1];
+          }
         }
         if (!potlock[2]) {
-          uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[14] != val) { ratchets[14]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[2]-(int)ratchet_pot_last[2]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[2],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[14] != val) { ratchets[14]=val; ratchet_editing=1; }
+            ratchet_pot_last[2]=pot[2];
+          }
         }
         if (!potlock[3]) {
-          uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
-          if (ratchets[15] != val) { ratchets[15]=val; ratchet_editing=1; }
+          int delta=abs((int)pot[3]-(int)ratchet_pot_last[3]);
+          if (delta >= RATCHET_POT_THRESHOLD) {
+            uint8_t val=map(pot[3],0,AD_RANGE-1,1,MAX_RATCHET);
+            if (val < 1) val=1;
+            if (val > MAX_RATCHET) val=MAX_RATCHET;
+            if (ratchets[15] != val) { ratchets[15]=val; ratchet_editing=1; }
+            ratchet_pot_last[3]=pot[3];
+          }
         }
       }
       else {
