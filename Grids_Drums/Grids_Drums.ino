@@ -64,8 +64,8 @@
 //#define DEBUG   // comment out to remove debug code
 
 //#define SAMPLERATE 11025 
-#define SAMPLERATE 22050  // saves CPU cycles
-//#define SAMPLERATE 44100
+//#define SAMPLERATE 22050  // saves CPU cycles
+#define SAMPLERATE 44100
 
 #define NUMPIXELS 1 // 
 #define RED 0x1f0000  // only using 5 bits to keep LEDs from getting too bright
@@ -147,10 +147,9 @@ struct voice_t {
 //#include "Pico_kit/samples.h"   // assorted samples
 //#include "testkit/samples.h"   // assorted samples
 //#include "EDM_kits/samples.h"   // Techno, Pop, Trap, House
-#include "House/samples.h"   // House 808 909 style kit
-
+//#include "House/samples.h"   // House 808 909 style kit
+#include "My_percussions/samples.h" 
 #define NUM_SAMPLES (sizeof(sample)/sizeof(sample_t))
-
 // Phaserville code, more or less lifted from Grids
 
 uint8_t ReadDrumMap(uint8_t step, uint8_t part, uint8_t x, uint8_t y) {

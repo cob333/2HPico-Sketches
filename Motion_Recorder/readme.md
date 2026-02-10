@@ -40,5 +40,3 @@ Adafruit Neopixel library
 **Notes:**
 
  If no clock is received for 1s, the play/record step resets to step 1.
- 
- During recording, a step only overwrites a channel if its pot moved (greater than MIN_POT_CHANGE). Otherwise the stored motion is played.
